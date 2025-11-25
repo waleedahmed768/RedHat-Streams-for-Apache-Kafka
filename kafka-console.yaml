@@ -1,0 +1,16 @@
+############Streams for Apache Kafka Console operator must be installed using OperatorHub##########
+kind: Console
+apiVersion: console.streamshub.github.com/v1alpha1
+metadata:
+  name: example-console
+  namespace: jazz-kafka-cluster
+spec:
+  hostname: kafka-ui.apps.ocp-amq.aksa.com.pk
+  kafkaClusters:
+    - name: my-cluster
+      namespace: client-kafka-cluster
+      listener: tls
+      credentials:
+        kafkaUser:
+          name: my-user
+

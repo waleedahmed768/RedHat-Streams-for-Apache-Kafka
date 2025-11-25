@@ -1,0 +1,14 @@
+kind: KafkaNodePool
+apiVersion: kafka.strimzi.io/v1beta2
+metadata:
+  name: my-pool-controller
+  labels:
+    strimzi.io/cluster: my-cluster
+  namespace: client-kafka-cluster
+spec:
+  replicas: 3
+  roles:
+    - controller
+  storage:
+    type: ephemeral
+
