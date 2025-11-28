@@ -141,3 +141,98 @@ It emphasises operator-based deployment (which aligns with Kubernetes/Openshift 
 It also highlights production vs eval differences (e.g., ephemeral storage vs persistent, etc).
 
 One thing to keep in mind: If you already have Kafka experience (e.g., managing brokers, topics, etc) you’ll still need to align with the OpenShift operator model (custom resources, node pools) and route/secret config for external access.
+
+
+
+4.10.4.2. Connecting to the broker from external clients 
+
+When you expose an acceptor to external clients (that is, by setting the value of the expose parameter to true), the Operator automatically creates a dedicated service and route for each broker pod in the deployment.
+
+An external client can connect to the broker by specifying the full host name of the route created for the broker pod. You can use a basic curl command to test external access to this full host name. For example:
+
+$ curl https://my-broker-deployment-0-svc-rte-my-openshift-project.my-openshift-domain
+Copy to Clipboard
+The full host name of the route for the broker pod must resolve to the node that is hosting the OpenShift router. The OpenShift router uses the host name to determine where to send the traffic inside the OpenShift internal network. By default, the OpenShift router listens to port 80 for non-secured (that is, non-SSL) traffic and port 443 for secured (that is, SSL-encrypted) traffic. For an HTTP connection, the router automatically directs traffic to port 443 if you specify a secure connection URL (that is, https), or to port 80 if you specify a non-secure connection URL (that is, http).
+
+If you want external clients to load balance connections across the brokers in the cluster:
+
+Enable load balancing by configuring the haproxy.router.openshift.io/balance roundrobin option on the OpenShift route for each broker pod.
+If an external client uses the Core protocol, set the useTopologyForLoadBalancing=false key in the client’s connection URL.
+
+Setting the useTopologyForLoadBalancing=false key prevents a client from using the AMQ Broker Pod DNS names that are in the cluster topology information provided by the broker. The Pod DNS names resolve to internal IP addresses, which an external client cannot access.
+
+If your brokers have durable subscription queues or request/reply queues, be aware of the caveats associated with using these queues when load balancing client connections. For more information, see Section 4.10.4.4, “Caveats to load balancing client connections when you have durable subscription queues or reply/request queues”.
+
+If you don’t want external clients to load balance connections across the brokers in the cluster:
+
+In each client’s connection URL, specify the full host name of the route for each broker pod. The client attempts to connect to the first host name in the connection URL. However, if the first host name is unavailable, the client automatically connects to the next host name in the connection URL, and so on.
+If an external client uses the Core protocol, set the useTopologyForLoadBalancing=false key in the client’s connection URL to prevent the client from using the cluster topology information provided by the broker.
+For non-HTTP connections:
+
+Clients must explicitly specify the port number (for example, port 443) as part of the connection URL.
+For one-way TLS, the client must specify the path to its trust store and the corresponding password, as part of the connection URL.
+For two-way TLS, the client must also specify the path to its key store and the corresponding password, as part of the connection URL.
+Some example client connection URLs, for supported messaging protocols, are shown below.
+
+External Core client, using one-way TLS
+
+
+tcp://my-broker-deployment-0-svc-rte-my-openshift-project.my-openshift-domain:443?useTopologyForLoadBalancing=false&sslEnabled=true \
+&trustStorePath=~/client.ts&trustStorePassword=<password>
+Copy to Clipboard
+
+Note
+The useTopologyForLoadBalancing key is explicitly set to false in the connection URL because an external Core client cannot use topology information returned by the broker. If this key is set to true or you do not specify a value, it results in a DEBUG log message.
+
+External Core client, using two-way TLS
+
+
+tcp://my-broker-deployment-0-svc-rte-my-openshift-project.my-openshift-domain:443?useTopologyForLoadBalancing=false&sslEnabled=true \
+&keyStorePath=~/client.ks&keyStorePassword=<password> \
+&trustStorePath=~/client.ts&trustStorePassword=<password>
+Show more
+
+
+Toggle word wrap
+External OpenWire client, using one-way TLS
+
+
+ssl://my-broker-deployment-0-svc-rte-my-openshift-project.my-openshift-domain:443"
+
+# Also, specify the following JVM flags
+-Djavax.net.ssl.trustStore=~/client.ts -Djavax.net.ssl.trustStorePassword=<password>
+Show more
+
+External OpenWire client, using two-way TLS
+
+
+ssl://my-broker-deployment-0-svc-rte-my-openshift-project.my-openshift-domain:443"
+
+# Also, specify the following JVM flags
+-Djavax.net.ssl.keyStore=~/client.ks -Djavax.net.ssl.keyStorePassword=<password> \
+-Djavax.net.ssl.trustStore=~/client.ts -Djavax.net.ssl.trustStorePassword=<password>
+Show more
+Copy to Clipboard
+External AMQP client, using one-way TLS
+
+
+amqps://my-broker-deployment-0-svc-rte-my-openshift-project.my-openshift-domain:443?transport.verifyHost=true \
+&transport.trustStoreLocation=~/client.ts&transport.trustStorePassword=<password>
+
+
+External AMQP client, using two-way TLS
+
+
+amqps://my-broker-deployment-0-svc-rte-my-openshift-project.my-openshift-domain:443?transport.verifyHost=true \
+&transport.keyStoreLocation=~/client.ks&transport.keyStorePassword=<password> \
+&transport.trustStoreLocation=~/client.ts&transport.trustStorePassword=<password>
+Show more
+
+
+4.10.4.3. Connecting to the Broker using a NodePort 
+
+As an alternative to using a route, an OpenShift administrator can configure a NodePort to connect to a broker pod from a client outside OpenShift. The NodePort should map to one of the protocol-specific ports specified by the acceptors configured for the broker.
+
+By default, NodePorts are in the range 30000 to 32767, which means that a NodePort typically does not match the intended port on the broker Pod.
+
+To connect from a client outside OpenShift to the broker via a NodePort, you specify a URL in the format <protocol>://<ocp_node_ip>:<node_port_number>.
