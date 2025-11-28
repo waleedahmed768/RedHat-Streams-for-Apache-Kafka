@@ -10,7 +10,5 @@ spec:
     - name: my-cluster
       namespace: client-kafka-cluster
       listener: tls
-      credentials:
-        kafkaUser:
-          name: my-user
+      
 
